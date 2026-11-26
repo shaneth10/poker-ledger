@@ -1,0 +1,1524 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5ef">
+<title>牌局账本</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f5f5ef;
+    --surface: #ffffff;
+    --ink: #182b25;
+    --muted: #52635a;
+    --line: #dce3da;
+    --green: #19573f;
+    --dark: #122f26;
+    --mint: #d9f4b5;
+    --mint-soft: #edf6e6;
+    --red: #a33732;
+    --red-soft: #fceceb;
+    --amber: #815421;
+    --amber-soft: #fbf1df;
+    --radius: 20px;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-synthesis: none;
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-text-size-adjust: 100%;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  h1, h2, h3, p, ol { margin: 0; }
+  button, input, select, textarea { font: inherit; }
+  button { cursor: pointer; touch-action: manipulation; }
+  button:disabled { cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid #27714c;
+    outline-offset: 3px;
+  }
+  .shell { max-width: 570px; margin: 0 auto; padding: 0 18px max(32px, env(safe-area-inset-bottom)); }
+  .masthead {
+    min-height: 75px; padding-top: env(safe-area-inset-top); display: flex;
+    align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark {
+    width: 35px; height: 35px; display: grid; place-items: center;
+    background: var(--dark); color: var(--mint); border-radius: 11px;
+    font-family: Georgia, serif; font-size: 24px; line-height: 1;
+  }
+  .brand h1 { font-size: 19px; letter-spacing: .02em; }
+  .toolbar {
+    display: flex; justify-content: space-between; align-items: center;
+    min-height: 48px; gap: 8px; margin-bottom: 12px;
+    border-block: 1px solid var(--line);
+  }
+  .save-status { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+  .save-status::before {
+    content: ""; width: 7px; height: 7px; background: #488365; border-radius: 50%; flex: none;
+  }
+  .save-status[data-error]::before { background: var(--red); }
+  .toolbar-actions, .row-actions { display: flex; gap: 5px; }
+  .button {
+    min-height: 44px; display: inline-flex; justify-content: center; align-items: center;
+    gap: 6px; padding: 8px 13px; border: 1px solid transparent; border-radius: 11px;
+    background: var(--surface); color: var(--ink); font-weight: 650; font-size: 13px; line-height: 1.25;
+    text-align: center;
+  }
+  .button:hover:not(:disabled) { filter: brightness(.96); }
+  .button:disabled { opacity: .46; }
+  .button-primary { background: var(--green); color: white; }
+  .button-outline { background: var(--surface); border-color: var(--line); }
+  .button-quiet { background: transparent; }
+  .button-quiet:not(:disabled) { color: var(--green); }
+  .button-mint { background: var(--mint); color: var(--dark); }
+  .button-soft { background: var(--mint-soft); color: var(--green); }
+  .button-danger { background: var(--red); color: white; }
+  .button-danger-soft { color: var(--red); background: var(--red-soft); }
+  .button-dark { color: #eef9e9; background: #ffffff0d; border-color: #ffffff35; }
+  .button-dark:focus-visible, .button-mint:focus-visible { outline-color: var(--mint); }
+  .toolbar .button { padding-inline: 8px; }
+  .tool-symbol { font: 18px/1 Georgia, serif; }
+  .board {
+    position: relative; isolation: isolate; overflow: hidden; border-radius: 23px;
+    background: linear-gradient(135deg, #214c3a, #132e25 74%); color: #f8fff3;
+    padding: 23px 20px 19px; box-shadow: 0 10px 25px #182b2514;
+  }
+  .board::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: repeating-linear-gradient(135deg, #ffffff08 0 1px, transparent 1px 17px);
+    mask-image: linear-gradient(to left, #000, transparent 80%);
+  }
+  .board-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 14px;
+  }
+  .board-meta { color: #dfede2; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+  .board h2 { font-size: clamp(24px, 7vw, 34px); line-height: 1.2; margin-bottom: 7px; overflow-wrap: anywhere; }
+  .board-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .badge {
+    flex: none; display: inline-flex; align-items: center; gap: 5px;
+    color: var(--green); background: var(--mint-soft); padding: 5px 8px;
+    border-radius: 99px; font-size: 11px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+  }
+  .badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .badge.done { color: var(--muted); background: var(--paper); }
+  .board .badge { color: #e7f9dc; background: #ffffff16; }
+  .board .badge.done { color: var(--mint); }
+  .board-totals {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; padding-top: 14px; border-top: 1px solid #ffffff35;
+  }
+  .board-totals > div + div { border-left: 1px solid #ffffff35; padding-left: 9px; }
+  .board-totals > div { min-width: 0; padding-right: 5px; }
+  .board-totals span { display: block; color: #dfede2; font-size: 11px; margin-bottom: 5px; }
+  .board-totals strong {
+    display: block; font-size: clamp(15px, 5.1vw, 25px); line-height: 1.15;
+    font-variant-numeric: tabular-nums; overflow-wrap: anywhere; letter-spacing: -.035em;
+  }
+  .board-totals .mismatch { color: #ffdb9d; }
+  .empty-board { min-height: 266px; padding: 29px 20px 24px; display: grid; align-items: center; }
+  .empty-board h2 { max-width: 8em; font-size: clamp(29px, 8vw, 43px); letter-spacing: -.035em; }
+  .empty-board p { max-width: 14em; font-size: 13px; margin: 10px 0 18px; }
+  .empty-board .button { padding-inline: 18px; }
+  .card-art {
+    position: absolute; z-index: -1; right: -9px; bottom: 22px; width: 150px; height: 170px;
+    pointer-events: none; opacity: .75;
+  }
+  .card-art::before, .card-art::after {
+    content: ""; width: 91px; height: 130px; position: absolute; border-radius: 12px;
+    border: 1px solid #c3e7ae65; background: #25523d; box-shadow: 0 9px 22px #102d2563;
+  }
+  .card-art::before {
+    top: 13px; right: 38px; transform: rotate(-20deg);
+    background: repeating-linear-gradient(45deg, #ffffff0e 0 1px, transparent 1px 7px), #234c3c;
+  }
+  .card-art::after {
+    content: "♠︎"; color: #d9f4b5ae; display: grid; place-items: center;
+    font: 47px/1 Georgia, serif; top: 23px; right: 17px; transform: rotate(16deg);
+  }
+  .game-nav { display: flex; justify-content: space-between; gap: 8px; margin: 11px 0 16px; }
+  .game-nav .button { padding-inline: 10px; }
+  .section + .section { margin-top: 20px; }
+  .section-head { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+  .section-head h3 { font-size: 17px; }
+  .section-head .count { color: var(--muted); font-size: 12px; font-weight: 500; margin-left: 7px; }
+  .surface { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+  .player-row, .buy-row, .game-row { padding: 10px 13px; }
+  .player-row + .player-row, .buy-row + .buy-row, .game-row + .game-row { border-top: 1px solid var(--line); }
+  .player-top, .buy-row, .game-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .identity strong, .game-row strong { overflow-wrap: anywhere; font-size: 14px; }
+  .avatar {
+    width: 29px; height: 29px; display: grid; place-items: center; flex: none;
+    border-radius: 9px; background: var(--mint-soft); color: var(--green); font-size: 12px; font-weight: 750;
+  }
+  .player-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-top: 4px; }
+  .player-stats span, .ledger-date { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .player-stats strong, .buy-value { font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .gain { color: var(--green); }
+  .loss { color: var(--red); }
+  .empty-list { padding: 19px 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .buy-list, .game-list { list-style: none; padding: 0; }
+  .buy-meta { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: 13px; }
+  .buy-kind { color: var(--muted); font-size: 11px; margin-left: 5px; }
+  .buy-value { text-align: right; }
+  .buy-row .button, .player-row .button { padding-inline: 7px; }
+  .game-row { padding: 0 8px 0 0; }
+  .game-row .game-open { flex: 1; justify-content: space-between; padding: 11px; text-align: left; min-width: 0; }
+  .game-row[aria-current="true"] { background: var(--mint-soft); }
+  .game-info { min-width: 0; }
+  .game-info small { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .notice {
+    margin: 10px 0; border-radius: 11px; padding: 10px 12px; border: 1px solid transparent;
+    color: var(--amber); background: var(--amber-soft); font-size: 13px; line-height: 1.55;
+  }
+  .notice.error { color: var(--red); background: var(--red-soft); }
+  .notice.good { color: var(--green); background: var(--mint-soft); }
+  dialog {
+    width: min(calc(100% - 24px), 514px); max-height: min(86vh, 740px); max-height: min(86dvh, 740px);
+    padding: 0; color: var(--ink); border: 0; border-radius: 21px; overflow: auto;
+    background: var(--surface); box-shadow: 0 18px 60px #122f2644;
+  }
+  dialog::backdrop { background: #152b22a8; }
+  .modal-heading {
+    position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .modal-heading h2 { font-size: 18px; }
+  .modal-body { padding: 15px 16px max(17px, env(safe-area-inset-bottom)); }
+  .field { display: grid; gap: 6px; margin-bottom: 13px; font-size: 13px; }
+  .field > span { font-weight: 700; }
+  .field input, .field select, .field textarea, .settlement-row input {
+    width: 100%; min-width: 0; min-height: 44px; border: 1px solid #aebcb2; border-radius: 10px;
+    padding: 9px 10px; background: var(--surface); color: var(--ink); font-size: 16px;
+  }
+  .field input:disabled, .field select:disabled { background: var(--paper); }
+  .field input[type="datetime-local"] { max-width: 100%; }
+  .field textarea { min-height: 73px; resize: vertical; }
+  .hint { display: block; font-size: 12px; color: var(--muted); line-height: 1.55; }
+  .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; margin-top: 14px; }
+  .modal-actions .separate { margin-right: auto; }
+  .presets { display: flex; gap: 7px; margin-top: -5px; margin-bottom: 13px; }
+  .presets .button { flex: 1; }
+  .confirm-copy { font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+  .settlement-summary { position: sticky; top: 61px; z-index: 1; padding: 1px 0 4px; background: var(--surface); }
+  .settlement-summary .notice { margin: 4px 0 7px; }
+  .settlement-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, .75fr);
+    align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line);
+  }
+  .settlement-row strong, .settlement-row small { display: block; overflow-wrap: anywhere; }
+  .settlement-row small { margin-top: 3px; font-size: 11px; color: var(--muted); }
+  .result-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+  .result-table th, .result-table td {
+    padding: 10px 7px; border-bottom: 1px solid var(--line);
+    text-align: right; vertical-align: top; overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
+  }
+  .result-table th:first-child { text-align: left; padding-left: 12px; }
+  .result-table thead { color: var(--muted); background: var(--paper); font-size: 11px; }
+  .result-table tfoot { font-weight: 700; background: var(--mint-soft); }
+  .result-table tfoot > tr > * { border-bottom: 0; }
+  .result-table tbody:last-child tr:last-child > * { border-bottom: 0; }
+  .result-table small { display: block; margin-top: 3px; color: var(--muted); font-weight: 400; }
+  .bill-summary { padding: 11px 12px; }
+  .bill-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .bill-preview .notice { margin-bottom: 10px; }
+  .toast {
+    position: fixed; z-index: 3; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%;
+    transform: translateX(-50%); max-width: calc(100% - 28px); width: max-content;
+    padding: 8px 9px 8px 13px; display: flex; align-items: center; gap: 8px;
+    border-radius: 13px; background: var(--ink); color: white; box-shadow: 0 6px 18px #182b253b;
+    font-size: 13px; pointer-events: none;
+  }
+  .toast .button { pointer-events: auto; }
+  @media (max-width: 360px) {
+    .shell { padding-inline: 12px; }
+    .board { padding-inline: 15px; }
+    .card-art { right: -25px; opacity: .6; }
+    .buy-row, .player-row { padding-inline: 9px; }
+  }
+  @media (max-width: 299px) {
+    .card-art { display: none; }
+    .brand h1 { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">♠︎</span>
+      <h1>牌局账本</h1>
+    </div>
+    <button id="new-game" class="button button-outline" type="button" hidden>＋ 新开一局</button>
+  </header>
+  <main>
+    <div class="toolbar" aria-label="历史操作">
+      <p id="save-status" class="save-status">保存在此浏览器</p>
+      <div class="toolbar-actions">
+        <button id="undo" class="button button-quiet" type="button" disabled><span class="tool-symbol" aria-hidden="true">↶</span>撤销</button>
+        <button id="redo" class="button button-quiet" type="button" disabled><span class="tool-symbol" aria-hidden="true">↷</span>重做</button>
+      </div>
+    </div>
+    <p id="storage-error" class="notice error" role="alert" hidden></p>
+    <div id="stage"></div>
+  </main>
+</div>
+<dialog id="modal" aria-labelledby="modal-title">
+  <header class="modal-heading">
+    <h2 id="modal-title"></h2>
+    <button id="close-modal" class="button button-quiet" type="button">关闭</button>
+  </header>
+  <div id="modal-body" class="modal-body"></div>
+</dialog>
+<div id="toast" class="toast" hidden>
+  <span id="toast-text" role="status"></span>
+  <button id="toast-undo" class="button button-mint" type="button">撤销</button>
+</div>
+<script id="ledger-finance">
+"use strict";
+let Finance;
+{
+  const CENTS_PER_YUAN = 100n;
+  const CENT_DIGITS = 2;
+  const MAX_CENTS = BigInt(Number.MAX_SAFE_INTEGER);
+  const FeeModes = Object.freeze({
+    ALL: "all", WINNERS_EQUAL: "winners-equal", WINNERS_WEIGHTED: "winners-weighted"
+  });
+
+  const sum = values => values.reduce((total, value) => total + value, 0n);
+  const min = (a, b) => a < b ? a : b;
+  const absolute = value => value < 0n ? -value : value;
+  function byRemainder(a, b) {
+    if (a.remainder === b.remainder) return a.index - b.index;
+    return a.remainder > b.remainder ? -1 : 1;
+  }
+
+  // The largest remainders receive the remaining units, with ties in player order.
+  function prorate(entries, target, weight) {
+    const weights = entries.map(weight);
+    const total = sum(weights);
+    if (!total || !target) return new Map();
+    const ranked = entries.map((entry, index) => {
+      const quota = target * weights[index];
+      return { id: entry.id, index, share: quota / total, remainder: quota % total };
+    }).sort(byRemainder);
+    const remainder = target - sum(ranked.map(row => row.share));
+    return new Map(ranked.map((row, index) => [row.id, row.share + (BigInt(index) < remainder ? 1n : 0n)]));
+  }
+
+  const getShare = (shares, id) => shares.get(id) ?? 0n;
+
+  function cappedShares(entries, target, weight) {
+    let open = entries.filter(entry => entry.cap > 0n);
+    let remaining = min(target, sum(open.map(entry => entry.cap)));
+    const paid = new Map();
+    while (remaining > 0n && open.length) {
+      const shares = prorate(open, remaining, weight);
+      const saturated = open.filter(entry => getShare(shares, entry.id) >= entry.cap);
+      if (!saturated.length) return new Map([...paid, ...shares]);
+      for (const entry of saturated) {
+        paid.set(entry.id, entry.cap);
+        remaining -= entry.cap;
+      }
+      open = open.filter(entry => !paid.has(entry.id));
+    }
+    return paid;
+  }
+
+  function parseYuan(value) {
+    const input = value.trim();
+    const [yuan, fraction = ""] = input.split(".");
+    if (!/^\d+(?:\.\d+)?$/u.test(input) || fraction.length > CENT_DIGITS) {
+      throw new Error("请输入金额，最多保留两位小数。");
+    }
+    const cents = BigInt(yuan) * CENTS_PER_YUAN + BigInt(fraction.padEnd(CENT_DIGITS, "0"));
+    if (cents > MAX_CENTS) throw new Error("金额超出可计算范围。");
+    return String(cents);
+  }
+
+  function yuanParts(cents) {
+    const positive = absolute(cents);
+    return [positive / CENTS_PER_YUAN, String(positive % CENTS_PER_YUAN).padStart(CENT_DIGITS, "0")];
+  }
+
+  function validateCents(value) {
+    if (typeof value !== "string" || !/^\d+$/u.test(value) || BigInt(value) > MAX_CENTS) {
+      throw new Error("请输入有效金额。");
+    }
+    return BigInt(value);
+  }
+
+  const uniform = () => 1n;
+  const profit = row => BigInt(row.net);
+  const loss = row => -BigInt(row.net);
+
+  function splitSides(rows) {
+    const winners = rows.filter(row => row.net > 0);
+    const losers = rows.filter(row => row.net < 0);
+    return { winners, losers, won: sum(winners.map(profit)), lost: sum(losers.map(loss)) };
+  }
+
+  function splitPool({ winners, losers }, pot) {
+    const receivable = prorate(winners, pot, profit);
+    const payable = prorate(losers, pot, loss);
+    return id => getShare(receivable, id) - getShare(payable, id);
+  }
+
+  function reconcile(rows) {
+    if (!rows.length) throw new Error("请先添加玩家。");
+    const original = rows.map(row => ({ ...row, net: (row.final ?? 0) - row.totalBuy }));
+    const sides = splitSides(original);
+    const delta = sides.won - sides.lost;
+    // Keep the smaller side intact and proportionally reduce the larger side.
+    const pool = min(sides.won, sides.lost);
+    const amountFor = splitPool(sides, pool);
+    const adjusted = original.map(row => ({ ...row, originalNet: row.net, net: Number(amountFor(row.id)) }));
+    return {
+      rows: adjusted, delta: Number(delta), pool: Number(pool),
+      missing: rows.filter(row => row.final === null).length
+    };
+  }
+
+  function divideRounded(numerator, denominator) {
+    const floor = numerator / denominator;
+    return floor + (numerator % denominator * 2n >= denominator ? 1n : 0n);
+  }
+
+  function cashAmounts(rows, unit, handCents) {
+    const sides = splitSides(rows);
+    if (sides.won !== sides.lost) throw new Error("请先确认筹码结算。");
+    const pot = divideRounded(sides.won * handCents, BigInt(unit));
+    const amountFor = splitPool(sides, pot);
+    return rows.map(row => ({
+      ...row, cash: amountFor(row.id),
+      protected: (row.originalNet ?? row.net) > 0 || row.net > 0
+    }));
+  }
+
+  function allFee(rows, fee) {
+    const initial = prorate(rows, fee, uniform);
+    const allocated = rows.map(row => {
+      const share = getShare(initial, row.id);
+      return { ...row, fee: row.protected ? min(share, row.cash) : share };
+    });
+    const shortage = fee - sum(allocated.map(row => row.fee));
+    const winners = allocated.filter(row => row.protected)
+      .map(row => ({ ...row, cap: row.cash - row.fee }));
+    const redistributed = cappedShares(winners, shortage, uniform);
+    return new Map(allocated.map(row => [row.id, row.fee + getShare(redistributed, row.id)]));
+  }
+
+  function splitFee(rows, mode, fee) {
+    if (mode === FeeModes.ALL) return allFee(rows, fee);
+    const winners = rows.filter(row => row.net > 0).map(row => ({ ...row, cap: row.cash }));
+    return cappedShares(winners, fee, mode === FeeModes.WINNERS_EQUAL ? uniform : profit);
+  }
+
+  function cashBill(rows, unit, settings) {
+    const { handCents, feeCents, mode } = settings;
+    const price = validateCents(handCents);
+    const venueFee = validateCents(feeCents);
+    if (!Object.values(FeeModes).includes(mode)) throw new Error("请选择棋牌费分摊方式。");
+    const amounts = cashAmounts(rows, unit, price);
+    const fees = splitFee(amounts, mode, venueFee);
+    const result = amounts.map(row => {
+      const fee = getShare(fees, row.id);
+      return { ...row, fee, amount: row.cash - fee };
+    });
+    return {
+      rows: result, unallocated: venueFee - sum(result.map(row => row.fee)),
+      totalReceive: sum(result.filter(row => row.amount > 0n).map(row => row.amount)),
+      totalPay: sum(result.filter(row => row.amount < 0n).map(row => -row.amount))
+    };
+  }
+
+  Finance = Object.freeze({ FeeModes, parseYuan, yuanParts, reconcile, cashBill });
+}
+</script>
+<script id="ledger-model">
+"use strict";
+let Ledger;
+{
+  const VERSION = 1;
+  const DEFAULT_CHIPS = 2000;
+  const MIN_BUY_CHIPS = 1;
+  const MIN_FINAL_CHIPS = 0;
+  const LIMITS = Object.freeze({ gameName: 40, playerName: 24 });
+  const Groups = Object.freeze({ GAMES: "games", PLAYERS: "players", BUYS: "buys" });
+  const Travel = Object.freeze({ UNDO: "undo", REDO: "redo" });
+  const Actions = Object.freeze({
+    CREATE: "create", RENAME_GAME: "rename-game", DELETE_GAME: "delete-game",
+    ADD_PLAYERS: "add-players", RENAME_PLAYER: "rename-player", DELETE_PLAYER: "delete-player",
+    SAVE_BUY: "save-buy", DELETE_BUY: "delete-buy", SAVE_SETTLEMENT: "save-settlement",
+    SETTLE: "settle", REOPEN: "reopen", SAVE_CHECKOUT: "save-checkout"
+  });
+
+  function empty() {
+    return {
+      version: VERSION, nextId: 0, selectedId: null,
+      data: { games: {}, players: {}, buys: {} }, past: [], future: []
+    };
+  }
+
+  function decode(raw) {
+    if (raw === null) return empty();
+    const saved = JSON.parse(raw);
+    const validData = Object.values(Groups).every(group => {
+      const collection = saved?.data?.[group];
+      return collection && typeof collection === "object" && !Array.isArray(collection);
+    });
+    if (!validData || saved.version !== VERSION || !Number.isSafeInteger(saved.nextId) ||
+        !Array.isArray(saved.past) || !Array.isArray(saved.future)) {
+      throw new Error("无法读取本地账本。");
+    }
+    return { ...saved, selectedId: selected(saved.data, saved.selectedId) };
+  }
+
+  function forGame(collection, gameId) {
+    return Object.values(collection).filter(item => item.gameId === gameId);
+  }
+
+  function games(data) {
+    return Object.values(data.games).sort((a, b) => b.at - a.at || Number(b.id) - Number(a.id));
+  }
+
+  function selected(data, id) {
+    return id && data.games[id] ? id : games(data)[0]?.id ?? null;
+  }
+
+  function checkInteger(value, min) {
+    if (!Number.isSafeInteger(value) || value < min) {
+      throw new Error(min === MIN_FINAL_CHIPS ? "请输入有效的非负整数筹码。" : "请输入有效的正整数筹码。");
+    }
+    return value;
+  }
+
+  function validateTime(value) {
+    if (!Number.isFinite(new Date(value).getTime()) || !Number.isSafeInteger(value)) {
+      throw new Error("请输入有效的日期和时间。");
+    }
+    return value;
+  }
+
+  function checkName(value, max, field) {
+    const name = value.trim();
+    if (!name || name.length > max) throw new Error(field + "须为 1–" + max + " 个字符。");
+    return name;
+  }
+
+  function checkNameAvailable(names, name) {
+    const key = name.toLowerCase();
+    if (names.has(key)) throw new Error("玩家重名，请给同名玩家加个备注。");
+    names.add(key);
+  }
+
+  function addChips(a, b) {
+    const sum = a + b;
+    if (!Number.isSafeInteger(sum)) throw new Error("筹码总额超出可计算范围。");
+    return sum;
+  }
+
+  function tally(rows) {
+    let totalFinal = 0;
+    let totalBuy = 0;
+    let entered = 0;
+    for (const row of rows) {
+      totalBuy = addChips(totalBuy, row.totalBuy);
+      if (row.final === null) continue;
+      entered += 1;
+      totalFinal = addChips(totalFinal, row.final);
+    }
+    const delta = totalFinal - totalBuy;
+    return { totalBuy, totalFinal, entered, delta, balanced: rows.length > 0 && entered === rows.length && delta === 0 };
+  }
+
+  function summarize(data, gameId) {
+    const buys = forGame(data.buys, gameId).sort((a, b) => b.at - a.at || Number(b.id) - Number(a.id));
+    const totals = new Map();
+    for (const buy of buys) {
+      totals.set(buy.playerId, addChips(totals.get(buy.playerId) ?? 0, buy.chips));
+    }
+    const rows = forGame(data.players, gameId).map(player => {
+      const totalBuy = totals.get(player.id) ?? 0;
+      const net = player.final === null ? null : player.final - totalBuy;
+      return { ...player, totalBuy, net };
+    });
+    return { rows, buys, ...tally(rows) };
+  }
+
+  function settledRows(game, rows) {
+    const nets = game.settlement?.nets;
+    if (!nets) return rows;
+    return rows.map(row => ({ ...row, originalNet: (row.final ?? 0) - row.totalBuy, net: nets[row.id] }));
+  }
+
+  function createGame({ command, allocate, data }) {
+    const id = allocate();
+    const game = {
+      id, name: checkName(command.name, LIMITS.gameName, "牌局名称"),
+      unit: checkInteger(command.unit, MIN_BUY_CHIPS), at: validateTime(command.at), settledAt: null
+    };
+    return {
+      gameId: id, label: "新开牌局",
+      changes: [put(data, Groups.GAMES, id, game), ...newPlayers(data, game, command, allocate)]
+    };
+  }
+
+  function newPlayers(data, game, { names, at }, allocate) {
+    const taken = new Set(forGame(data.players, game.id).map(player => player.name.toLowerCase()));
+    return names.flatMap(value => {
+      const name = checkName(value, LIMITS.playerName, "玩家姓名");
+      checkNameAvailable(taken, name);
+      const player = { id: allocate(), gameId: game.id, name, final: null };
+      const buy = {
+        id: allocate(), gameId: game.id, playerId: player.id,
+        initial: true, chips: game.unit, at: validateTime(at)
+      };
+      return [put(data, Groups.PLAYERS, player.id, player), put(data, Groups.BUYS, buy.id, buy)];
+    });
+  }
+
+  function renamePlayer({ data, game, command }) {
+    const player = requireMember(data.players, command.playerId, game.id);
+    const name = checkName(command.name, LIMITS.playerName, "玩家姓名");
+    const taken = new Set(forGame(data.players, game.id)
+      .filter(other => other.id !== player.id).map(other => other.name.toLowerCase()));
+    checkNameAvailable(taken, name);
+    return [put(data, Groups.PLAYERS, player.id, { ...player, name })];
+  }
+
+  function requireMember(collection, id, gameId) {
+    const item = collection[id];
+    if (!item || item.gameId !== gameId) throw new Error("这条记录已不存在。");
+    return item;
+  }
+
+  function deletePlayer({ data, game, command }) {
+    const player = requireMember(data.players, command.playerId, game.id);
+    const buys = forGame(data.buys, game.id).filter(buy => buy.playerId === player.id);
+    return [put(data, Groups.PLAYERS, player.id, null), ...buys.map(buy => put(data, Groups.BUYS, buy.id, null))];
+  }
+
+  function deleteGame({ data, game }) {
+    const removeGroup = group => forGame(data[group], game.id).map(item => put(data, group, item.id, null));
+    return [put(data, Groups.GAMES, game.id, null), ...removeGroup(Groups.PLAYERS), ...removeGroup(Groups.BUYS)];
+  }
+
+  function saveBuy({ data, game, command, allocate }) {
+    const current = command.id ? requireMember(data.buys, command.id, game.id) : null;
+    const playerId = current?.initial ? current.playerId : command.playerId;
+    requireMember(data.players, playerId, game.id);
+    const buy = {
+      id: current?.id ?? allocate(), gameId: game.id, playerId, initial: current?.initial ?? false,
+      chips: current?.initial ? game.unit : checkInteger(command.chips, MIN_BUY_CHIPS), at: validateTime(command.at)
+    };
+    return [put(data, Groups.BUYS, buy.id, buy)];
+  }
+
+  function deleteBuy({ data, game, command }) {
+    const buy = requireMember(data.buys, command.id, game.id);
+    if (buy.initial) throw new Error("移除玩家时会一并移除首买。");
+    return [put(data, Groups.BUYS, buy.id, null)];
+  }
+
+  function rowsWithCounts(rows, counts) {
+    return rows.map(row => {
+      const value = counts[row.id] ?? null;
+      return { ...row, final: value === null ? null : checkInteger(value, MIN_FINAL_CHIPS) };
+    });
+  }
+
+  function settlement({ data, game, command }) {
+    const rows = rowsWithCounts(summarize(data, game.id).rows, command.counts);
+    const changes = rows.map(({ id, final }) => put(data, Groups.PLAYERS, id, { ...data.players[id], final }));
+    tally(rows);
+    if (command.type === Actions.SAVE_SETTLEMENT) return changes;
+    const { rows: adjusted, ...result } = Finance.reconcile(rows);
+    if (result.missing && !command.confirmMissing) throw new Error("请确认未录入的玩家按 0 筹码结算。");
+    const settledAt = game.settledAt ?? validateTime(command.at);
+    const nets = Object.fromEntries(adjusted.map(row => [row.id, row.net]));
+    const updated = changes.some(change => change.before.final !== change.after.final);
+    const checkout = updated ? null : game.checkout ?? null;
+    return [...changes, put(data, Groups.GAMES, game.id, { ...game, settledAt, settlement: { ...result, nets }, checkout })];
+  }
+
+  function saveCheckout({ data, game, command }) {
+    if (game.settledAt === null) throw new Error("请先确认筹码结算。");
+    const { handCents, feeCents, mode } = command;
+    const checkout = { handCents, feeCents, mode };
+    const rows = settledRows(game, summarize(data, game.id).rows);
+    const bill = Finance.cashBill(rows, game.unit, checkout);
+    if (bill.unallocated > 0n) throw new Error("当前方式无法分摊全部棋牌费。");
+    return [put(data, Groups.GAMES, game.id, { ...game, checkout })];
+  }
+
+  function renameGame({ data, game, command }) {
+    const name = checkName(command.name, LIMITS.gameName, "牌局名称");
+    return [put(data, Groups.GAMES, game.id, { ...game, name })];
+  }
+
+  function reopen({ data, game }) {
+    return [put(data, Groups.GAMES, game.id, { ...game, settledAt: null, settlement: null, checkout: null })];
+  }
+
+  const operations = {
+    [Actions.RENAME_GAME]: { label: "重命名牌局", run: renameGame, allowSettled: true },
+    [Actions.DELETE_GAME]: { label: "删除牌局", run: deleteGame, allowSettled: true },
+    [Actions.ADD_PLAYERS]: { label: "添加玩家", run: ctx => newPlayers(ctx.data, ctx.game, ctx.command, ctx.allocate) },
+    [Actions.RENAME_PLAYER]: { label: "修改玩家姓名", run: renamePlayer, allowSettled: true },
+    [Actions.DELETE_PLAYER]: { label: "移除玩家", run: deletePlayer },
+    [Actions.SAVE_BUY]: { label: command => command.id ? "修改买入" : "记录买入", run: saveBuy },
+    [Actions.DELETE_BUY]: { label: "删除买入", run: deleteBuy },
+    [Actions.SAVE_SETTLEMENT]: { label: "保存结算草稿", run: settlement },
+    [Actions.SETTLE]: { label: "确认结算", run: settlement, allowSettled: true },
+    [Actions.SAVE_CHECKOUT]: { label: "保存结账单", run: saveCheckout, allowSettled: true },
+    [Actions.REOPEN]: { label: "重开牌局", run: reopen, allowSettled: true }
+  };
+
+  function prepare(context) {
+    const { command, data } = context;
+    if (command.type === Actions.CREATE) return createGame(context);
+    const game = data.games[command.gameId];
+    if (!game) throw new Error("这局牌局已不存在。");
+    const operation = operations[command.type];
+    if (!operation) throw new Error("找不到该操作。");
+    if (game.settledAt !== null && !operation.allowSettled) throw new Error("请先重开牌局，再修改买入。");
+    const label = typeof operation.label === "function" ? operation.label(command) : operation.label;
+    return { gameId: game.id, label, changes: operation.run({ ...context, game }) };
+  }
+
+  function put(data, group, id, after) {
+    return { group, id, before: data[group][id] ?? null, after };
+  }
+
+  function apply(data, changes, direction) {
+    const result = { ...data };
+    const copied = new Set();
+    for (const { group, id, before, after } of changes) {
+      if (!copied.has(group)) {
+        result[group] = { ...result[group] };
+        copied.add(group);
+      }
+      const value = direction === Travel.UNDO ? before : after;
+      if (value === null) delete result[group][id];
+      else result[group][id] = value;
+    }
+    return result;
+  }
+
+  function execute(ledger, command) {
+    let { nextId } = ledger;
+    const pending = prepare({ command, data: ledger.data, allocate: () => String(++nextId) });
+    const changes = pending.changes.filter(({ before, after }) => JSON.stringify(before) !== JSON.stringify(after));
+    if (!changes.length) return ledger;
+    const data = apply(ledger.data, changes, Travel.REDO);
+    if (data.games[pending.gameId]) summarize(data, pending.gameId);
+    const entry = { ...pending, changes, previousId: ledger.selectedId };
+    const removedSelection = !data.games[ledger.selectedId];
+    const affectsSelection = command.type === Actions.CREATE || pending.gameId === ledger.selectedId;
+    const preferred = affectsSelection || removedSelection ? pending.gameId : ledger.selectedId;
+    return {
+      ...ledger, data, nextId, selectedId: selected(data, preferred),
+      past: [...ledger.past, entry], future: []
+    };
+  }
+
+  function select(ledger, id) {
+    const selectedId = selected(ledger.data, id);
+    return selectedId === ledger.selectedId ? ledger : { ...ledger, selectedId };
+  }
+
+  function travel(ledger, direction) {
+    const undo = direction === Travel.UNDO;
+    const source = undo ? ledger.past : ledger.future;
+    const entry = source.at(-1);
+    if (!entry) return ledger;
+    const data = apply(ledger.data, entry.changes, direction);
+    const preferred = data.games[entry.gameId] ? entry.gameId : entry.previousId;
+    return {
+      ...ledger, data, selectedId: selected(data, preferred),
+      past: undo ? source.slice(0, -1) : [...ledger.past, entry],
+      future: undo ? [...ledger.future, entry] : source.slice(0, -1)
+    };
+  }
+
+  Ledger = Object.freeze({
+    DEFAULT_CHIPS, LIMITS, Actions, Travel, empty, decode, games, select, execute, travel,
+    summarize, tally, rowsWithCounts, settledRows
+  });
+}
+</script>
+<script>
+"use strict";
+{
+  const STORAGE_KEY = "poker-ledger:v1";
+  const TOAST_DURATION_MS = 4800;
+  const MILLISECONDS_PER_MINUTE = 60_000;
+  const QUICK_HANDS = [1, 2, 3];
+  const { Actions, Travel } = Ledger;
+  const { FeeModes } = Finance;
+  const feeLabels = Object.freeze({
+    [FeeModes.ALL]: "所有人均分",
+    [FeeModes.WINNERS_EQUAL]: "水上玩家均分",
+    [FeeModes.WINNERS_WEIGHTED]: "水上玩家按比例出"
+  });
+  const $ = id => document.getElementById(id);
+  const dialog = $("modal");
+  const modalBody = $("modal-body");
+  const numberFormat = new Intl.NumberFormat("zh-CN");
+  const dateFormat = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const timeFormat = new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+  });
+  let ledger = Ledger.empty();
+  let lastSaved = null;
+  let readable = false;
+  let toastTimer;
+
+  function safe(value) {
+    return String(value).replace(/[&<>"']/gu, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
+  }
+
+  function number(amount) {
+    return amount === null ? "—" : numberFormat.format(amount);
+  }
+
+  function signed(amount) {
+    return amount > 0 ? "+" + number(amount) : number(amount);
+  }
+
+  function netClass(amount) {
+    if (amount > 0) return "gain";
+    return amount < 0 ? "loss" : "";
+  }
+
+  function dateTime(at) {
+    return dateFormat.format(at) + " " + timeFormat.format(at);
+  }
+
+  function dateInput(at) {
+    const offset = new Date(at).getTimezoneOffset() * MILLISECONDS_PER_MINUTE;
+    const iso = new Date(at - offset).toISOString();
+    return iso.slice(0, iso.indexOf("."));
+  }
+
+  function names(value) {
+    return value.split(/[\r\n,，、]+/u).map(name => name.trim()).filter(Boolean);
+  }
+
+  function chipValue(value) {
+    return /^[0-9]+$/u.test(value) ? Number(value) : NaN;
+  }
+
+  function getGame() {
+    return ledger.data.games[ledger.selectedId];
+  }
+
+  function storageNotice(message = "") {
+    const status = $("save-status");
+    status.textContent = message ? "本地保存异常" : "保存在此浏览器";
+    status.toggleAttribute("data-error", Boolean(message));
+    const banner = $("storage-error");
+    banner.hidden = !message;
+    banner.textContent = message;
+  }
+
+  function readStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      ledger = Ledger.decode(raw);
+      lastSaved = raw;
+      readable = true;
+      storageNotice();
+    } catch {
+      readable = false;
+      storageNotice("当前浏览器无法读取本地账本。请在支持网页存储的浏览器中打开同一个页面。");
+    }
+  }
+
+  function persist(next) {
+    if (!readable) throw new Error("无法访问本地存储，当前操作未保存。");
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === lastSaved) {
+        const raw = JSON.stringify(next);
+        localStorage.setItem(STORAGE_KEY, raw);
+        lastSaved = raw;
+        ledger = next;
+        storageNotice();
+        return;
+      }
+    } catch {
+      storageNotice("无法写入本地账本。请检查浏览器的存储权限或剩余空间。");
+      throw new Error("当前操作未保存，表单内容仍在。");
+    }
+    readStorage();
+    render();
+    throw new Error("账本已在另一个页面更新，当前操作未保存。请关闭表单后再试。");
+  }
+
+  function toast(message, allowUndo = false) {
+    clearTimeout(toastTimer);
+    $("toast").hidden = false;
+    $("toast-text").textContent = message;
+    $("toast-undo").hidden = !allowUndo;
+    toastTimer = setTimeout(() => { $("toast").hidden = true; }, TOAST_DURATION_MS);
+  }
+
+  function updateHistory() {
+    for (const [direction, stack, label] of [
+      [Travel.UNDO, ledger.past, "撤销"], [Travel.REDO, ledger.future, "重做"]
+    ]) {
+      const button = $(direction);
+      const entry = stack.at(-1);
+      button.disabled = !entry || !readable;
+      button.title = entry ? label + " · " + entry.label : label;
+    }
+  }
+
+  function actionButton(label, action, { kind = "outline", id = "", disabled = false, aria = "" } = {}) {
+    return `<button type="button" class="button button-${kind}" data-ui="${action}"
+      ${id ? `data-id="${safe(id)}"` : ""} ${disabled ? "disabled" : ""}
+      ${aria ? `aria-label="${safe(aria)}"` : ""}>${label}</button>`;
+  }
+
+  function stateBadge(game) {
+    const settled = game.settledAt !== null;
+    return `<span class="badge ${settled ? "done" : ""}">${settled ? "已结算" : "进行中"}</span>`;
+  }
+
+  function emptyBoard() {
+    return `<section class="board empty-board">
+      <span class="card-art" aria-hidden="true"></span>
+      <div>
+        <h2>每次买入都记账</h2>
+        <p class="board-meta">添加当局玩家，自动记一手首买。默认每手 ${number(Ledger.DEFAULT_CHIPS)} 筹码。</p>
+        ${actionButton("＋ 新开一局", "new-game", { kind: "mint" })}
+      </div>
+    </section>`;
+  }
+
+  function reconciliation(summary) {
+    const { rows, entered, delta, balanced } = summary;
+    if (!rows.length) return "待加玩家";
+    if (!entered) return "待录入";
+    if (entered < rows.length) return `已填 ${entered} / ${rows.length} 人`;
+    if (balanced) return "已对平";
+    return delta < 0 ? `差 ${number(-delta)}` : `多 ${number(delta)}`;
+  }
+
+  function boardMetric(label, value, extraClass = "") {
+    return `<div><span>${label}</span><strong class="${extraClass}">${value}</strong></div>`;
+  }
+
+  function board(game, summary) {
+    const settled = game.settledAt !== null;
+    const adjusted = settled && Boolean(game.settlement?.delta || game.settlement?.missing);
+    const mismatch = !settled && summary.entered === summary.rows.length && !summary.balanced && summary.entered > 0;
+    const primary = settled ? actionButton("重开牌局", "reopen", { kind: "dark" })
+      : actionButton("＋ 记录买入", "add-buy", { kind: "mint", disabled: !summary.rows.length });
+    const settle = actionButton(settled ? "查看结算" : "录入结算", settled ? "settlement-details" : "settlement", {
+      kind: settled ? "mint" : "dark", disabled: !summary.rows.length
+    });
+    return `<section class="board" aria-labelledby="game-title">
+      <div class="board-head">
+        <div>
+          <h2 id="game-title">${safe(game.name)}</h2>
+          <p class="board-meta">${dateFormat.format(game.at)} · 每手 ${number(game.unit)} 筹码</p>
+        </div>
+        ${stateBadge(game)}
+      </div>
+      <div class="board-totals">
+        ${boardMetric("累计买入", number(summary.totalBuy))}
+        ${boardMetric("已录筹码", number(summary.entered ? summary.totalFinal : null))}
+        ${boardMetric("对账状态", adjusted ? "已调账" : reconciliation(summary), mismatch ? "mismatch" : "")}
+      </div>
+      <div class="board-buttons">${primary}${settle}</div>
+    </section>`;
+  }
+
+  function playerRow(row, settled) {
+    const initial = Array.from(row.name)[0];
+    const edit = actionButton("编辑", "edit-player", { id: row.id, kind: "quiet", aria: "编辑" + row.name });
+    const buy = settled ? "" : actionButton("＋ 买入", "add-buy", {
+      id: row.id, kind: "soft", aria: "为" + row.name + "记录买入"
+    });
+    return `<article class="player-row">
+      <div class="player-top">
+        <div class="identity"><span class="avatar" aria-hidden="true">${safe(initial)}</span><strong>${safe(row.name)}</strong></div>
+        <div class="row-actions">${edit}${buy}</div>
+      </div>
+      <div class="player-stats">
+        ${boardMetric("已买入", number(row.totalBuy))}
+        ${boardMetric("最终筹码", settled && row.final === null ? "0（未录）" : number(row.final))}
+        ${boardMetric(settled ? "结算输赢" : "净输赢", signed(row.net), netClass(row.net))}
+      </div>
+    </article>`;
+  }
+
+  function playersSection(game, summary) {
+    const settled = game.settledAt !== null;
+    const add = settled ? "" : actionButton("＋ 添加玩家", "add-players");
+    const rows = settled ? Ledger.settledRows(game, summary.rows) : summary.rows;
+    const content = rows.length ? rows.map(row => playerRow(row, settled)).join("")
+      : '<p class="empty-list">添加玩家后，会自动在流水里记一手首买。</p>';
+    return `<section class="section" aria-labelledby="players-title">
+      <header class="section-head">
+        <h3 id="players-title">玩家<span class="count">${summary.rows.length} 人</span></h3>${add}
+      </header>
+      <div class="surface">${content}</div>
+    </section>`;
+  }
+
+  function buyRow(buy, game, player) {
+    const edit = game.settledAt !== null ? "" : actionButton("编辑", "edit-buy", {
+      id: buy.id, kind: "quiet", aria: "编辑" + player.name + "的" + (buy.initial ? "首买" : "加买")
+    });
+    return `<li class="buy-row">
+      <div class="buy-meta">
+        <time class="ledger-date" datetime="${new Date(buy.at).toISOString()}">${dateTime(buy.at)}</time>
+        <strong>${safe(player.name)}</strong><span class="buy-kind">${buy.initial ? "首买" : "加买"}</span>
+      </div>
+      <strong class="buy-value">+${number(buy.chips)}</strong>${edit}
+    </li>`;
+  }
+
+  function buysSection(game, summary) {
+    const content = summary.buys.length ? `<ol class="buy-list">${summary.buys
+      .map(buy => buyRow(buy, game, ledger.data.players[buy.playerId])).join("")}</ol>`
+      : '<p class="empty-list">这里会按时间倒序显示每笔买入。</p>';
+    return `<section class="section" aria-labelledby="buys-title">
+      <header class="section-head"><h3 id="buys-title">买入流水<span class="count">${summary.buys.length} 笔</span></h3></header>
+      <div class="surface">${content}</div>
+    </section>`;
+  }
+
+  function dashboard(game) {
+    const summary = Ledger.summarize(ledger.data, game.id);
+    const totalGames = Ledger.games(ledger.data).length;
+    return board(game, summary) + `<nav class="game-nav" aria-label="牌局管理">
+      ${actionButton(`牌局列表 · ${totalGames}`, "games")}
+      ${actionButton("牌局设置", "settings", { kind: "quiet" })}
+    </nav>` + checkoutSection(game, summary) + playersSection(game, summary) + buysSection(game, summary);
+  }
+
+  function render() {
+    updateHistory();
+    const game = getGame();
+    $("new-game").hidden = !game;
+    $("stage").innerHTML = game ? dashboard(game) : emptyBoard();
+  }
+
+  function show(title, content) {
+    $("modal-title").textContent = title;
+    modalBody.innerHTML = content;
+    if (!dialog.open) dialog.showModal();
+    dialog.scrollTop = 0;
+  }
+
+  function onForm(handler) {
+    const form = modalBody.querySelector("form");
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      form.querySelector(".form-error").hidden = true;
+      try {
+        handler(form.elements, event.submitter?.value);
+      } catch (error) {
+        const message = form.querySelector(".form-error");
+        message.textContent = error.message;
+        message.hidden = false;
+      }
+    });
+    return form;
+  }
+
+  function formError() {
+    return '<p class="notice error form-error" role="alert" hidden></p>';
+  }
+
+  function submit(label, value = "", kind = "primary") {
+    return `<button type="submit" class="button button-${kind}" value="${value}">${label}</button>`;
+  }
+
+  function save(type, fields, gameId = ledger.selectedId) {
+    const next = Ledger.execute(ledger, { type, gameId, ...fields });
+    if (next === ledger) {
+      dialog.close();
+      return;
+    }
+    persist(next);
+    dialog.close();
+    render();
+    toast("已" + ledger.past.at(-1).label, true);
+  }
+
+  function changeHistory(direction) {
+    try {
+      const next = Ledger.travel(ledger, direction);
+      if (next === ledger) return;
+      persist(next);
+      render();
+      const entry = direction === Travel.UNDO ? ledger.future.at(-1) : ledger.past.at(-1);
+      toast((direction === Travel.UNDO ? "已撤销 · " : "已重做 · ") + entry.label);
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  function field(label, input) {
+    return `<label class="field"><span>${label}</span>${input}</label>`;
+  }
+
+  function inputText(name, value, max, placeholder = "") {
+    return `<input name="${name}" value="${safe(value)}" maxlength="${max}" placeholder="${placeholder}" autocomplete="off" required>`;
+  }
+
+  function inputChips(name, value, { required = false, disabled = false, placeholder = "" } = {}) {
+    return `<input name="${name}" value="${value ?? ""}" placeholder="${placeholder}" autocomplete="off"
+      inputmode="numeric" pattern="[0-9]+" ${required ? "required" : ""} ${disabled ? "disabled" : ""}>`;
+  }
+
+  function namesField(label) {
+    return field(label, '<textarea name="names" placeholder="如 阿文、小陈、小林" autocomplete="off"></textarea>'
+      + '<small class="hint">多人可用逗号、顿号或换行分开。</small>');
+  }
+
+  function showNewGame() {
+    const today = dateFormat.format(Date.now());
+    show("新开一局", `<form>
+      ${field("牌局名称", inputText("title", today + " 牌局", Ledger.LIMITS.gameName))}
+      ${field("每手筹码", inputChips("unit", Ledger.DEFAULT_CHIPS, { required: true }))}
+      ${namesField("玩家（可稍后添加）")}
+      ${formError()}
+      <div class="modal-actions">${submit("创建牌局")}</div>
+    </form>`);
+    onForm(elements => save(Actions.CREATE, {
+      name: elements.title.value, unit: chipValue(elements.unit.value),
+      names: names(elements.names.value), at: Date.now()
+    }));
+  }
+
+  function showAddPlayers() {
+    const game = getGame();
+    show("添加玩家", `<form>
+      <p class="hint">每位新玩家自动记录 ${number(game.unit)} 筹码的首买。</p>
+      ${namesField("玩家姓名")}
+      ${formError()}
+      <div class="modal-actions">${submit("添加玩家")}</div>
+    </form>`);
+    onForm(elements => {
+      const list = names(elements.names.value);
+      if (!list.length) throw new Error("请至少填写一位玩家。");
+      save(Actions.ADD_PLAYERS, { names: list, at: Date.now() }, game.id);
+    });
+  }
+
+  function gameRow(game) {
+    const current = game.id === ledger.selectedId;
+    return `<li class="game-row" ${current ? 'aria-current="true"' : ""}>
+      <button class="button button-quiet game-open" type="button" data-ui="open-game" data-id="${game.id}">
+        <span class="game-info"><strong>${safe(game.name)}</strong><small>${dateTime(game.at)}</small></span>
+        ${stateBadge(game)}
+      </button>
+      ${actionButton("删除", "delete-game", { kind: "danger-soft", id: game.id, aria: "删除牌局 " + game.name })}
+    </li>`;
+  }
+
+  function showGames() {
+    const items = Ledger.games(ledger.data).map(gameRow).join("");
+    show("牌局列表", `<ol class="surface game-list">${items}</ol>`);
+  }
+
+  function openGame(id) {
+    const next = Ledger.select(ledger, id);
+    if (next !== ledger) persist(next);
+    dialog.close();
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function showSettings() {
+    const game = getGame();
+    show("牌局设置", `<form>
+      ${field("牌局名称", inputText("title", game.name, Ledger.LIMITS.gameName))}
+      ${formError()}
+      <div class="modal-actions">
+        <div class="separate">${actionButton("删除整局", "delete-game", { kind: "danger-soft", id: game.id })}</div>
+        ${submit("保存名称")}
+      </div>
+    </form>`);
+    onForm(elements => save(Actions.RENAME_GAME, { name: elements.title.value }, game.id));
+  }
+
+  function confirm(title, copy, label, kind, callback) {
+    show(title, `<form><p class="confirm-copy">${copy}</p>${formError()}
+      <div class="modal-actions">
+        ${actionButton("取消", "close")}
+        ${submit(label, "", kind)}
+      </div>
+    </form>`);
+    onForm(callback);
+  }
+
+  function confirmGameDelete(id) {
+    const game = ledger.data.games[id];
+    confirm("删除整局", `「${safe(game.name)}」的玩家、买入和结算会一起从牌局列表移除，可用「撤销」恢复。`,
+      "删除整局", "danger", () => save(Actions.DELETE_GAME, {}, id));
+  }
+
+  function showPlayer(id) {
+    const game = getGame();
+    const player = ledger.data.players[id];
+    const remove = game.settledAt === null ? actionButton("移除玩家", "delete-player", { kind: "danger-soft", id }) : "";
+    show("编辑玩家", `<form>
+      ${field("玩家姓名", inputText("playerName", player.name, Ledger.LIMITS.playerName))}
+      ${formError()}
+      <div class="modal-actions"><div class="separate">${remove}</div>${submit("保存姓名")}</div>
+    </form>`);
+    onForm(elements => save(Actions.RENAME_PLAYER, { playerId: id, name: elements.playerName.value }, game.id));
+  }
+
+  function confirmPlayerDelete(id) {
+    const player = ledger.data.players[id];
+    confirm("移除玩家", `「${safe(player.name)}」的买入和最终筹码会一起移除，可用「撤销」恢复。`,
+      "移除玩家", "danger", () => save(Actions.DELETE_PLAYER, { playerId: id }, player.gameId));
+  }
+
+  function playerSelect(rows, playerId, initial) {
+    const options = rows.map(player => `<option value="${player.id}" ${player.id === playerId ? "selected" : ""}>${safe(player.name)}</option>`);
+    return `<select name="player" ${initial ? "disabled" : "required"}>
+      <option value="">请选择玩家</option>${options.join("")}
+    </select>`;
+  }
+
+  function buyPresets(unit) {
+    const buttons = QUICK_HANDS.map(hands => actionButton(hands + " 手", "buy-preset", {
+      id: String(hands * unit), disabled: !Number.isSafeInteger(hands * unit), kind: "soft"
+    }));
+    return `<div class="presets">${buttons.join("")}</div>`;
+  }
+
+  function showBuy(id, preferredPlayerId) {
+    const game = getGame();
+    const buy = ledger.data.buys[id];
+    const initial = Boolean(buy?.initial);
+    const { rows } = Ledger.summarize(ledger.data, game.id);
+    const playerId = buy?.playerId || preferredPlayerId || (rows.length === 1 ? rows[0].id : "");
+    const remove = buy && !initial ? actionButton("删除买入", "delete-buy", { kind: "danger-soft", id }) : "";
+    const heading = buy ? (initial ? "编辑首买" : "编辑买入") : "记录买入";
+    const time = dateInput(buy?.at ?? Date.now());
+    show(heading, `<form>
+      ${field("玩家", playerSelect(rows, playerId, initial))}
+      ${field("买入筹码", inputChips("chips", buy?.chips ?? game.unit, { required: true, disabled: initial }))}
+      ${initial ? "" : buyPresets(game.unit)}
+      ${field("买入时间", `<input type="datetime-local" name="at" step="1" value="${time}" required>`)}
+      ${formError()}
+      <div class="modal-actions"><div class="separate">${remove}</div>${submit("保存买入")}</div>
+    </form>`);
+    onForm(elements => {
+      const enteredAt = new Date(elements.at.value).getTime();
+      const unchangedTime = buy && enteredAt === new Date(time).getTime();
+      save(Actions.SAVE_BUY, {
+        id, playerId: elements.player.value, chips: chipValue(elements.chips.value),
+        at: unchangedTime ? buy.at : enteredAt
+      }, game.id);
+    });
+  }
+
+  function confirmBuyDelete(id) {
+    const buy = ledger.data.buys[id];
+    const player = ledger.data.players[buy.playerId];
+    confirm("删除买入", `删除「${safe(player.name)}」在 ${dateTime(buy.at)} 记录的 ${number(buy.chips)} 筹码买入。`,
+      "删除买入", "danger", () => save(Actions.DELETE_BUY, { id }, buy.gameId));
+  }
+
+  function confirmReopen() {
+    const game = getGame();
+    const copy = "重开后可以修改买入和玩家。已录筹码会保留为草稿。";
+    confirm("重开牌局", copy + (game.checkout ? "当前现金账单会撤回。" : ""),
+      "重开牌局", "primary", () => save(Actions.REOPEN, {}, game.id));
+  }
+
+  function settlementRow(row) {
+    return `<label class="settlement-row">
+      <span><strong>${safe(row.name)}</strong><small>买入 ${number(row.totalBuy)} · <span data-net="${row.id}"></span></small></span>
+      ${inputChips("count-" + row.id, row.final, { placeholder: "最终筹码" })}
+    </label>`;
+  }
+
+  function settlementCounts(form, rows) {
+    return Object.fromEntries(rows.map(row => {
+      const value = form.elements["count-" + row.id].value.trim();
+      return [row.id, value === "" ? null : chipValue(value)];
+    }));
+  }
+
+  function tallyText(totals, length) {
+    const { totalBuy, totalFinal, delta, entered } = totals;
+    const difference = (delta > 0 ? "多 " : "少 ") + number(Math.abs(delta));
+    const status = entered ? (delta === 0 ? "已对平" : difference) : "待录入";
+    const missing = entered < length ? ` · 已填 ${entered} / ${length} 人` : "";
+    return `累计买入 ${number(totalBuy)} · 已录 ${number(totalFinal)} · ${status}${missing}`;
+  }
+
+  function settlementPreview(form, rows) {
+    const message = form.querySelector("#settlement-status");
+    const previewButton = form.querySelector('[value="' + Actions.SETTLE + '"]');
+    try {
+      const current = Ledger.rowsWithCounts(rows, settlementCounts(form, rows));
+      const totals = Ledger.tally(current);
+      message.textContent = tallyText(totals, rows.length);
+      message.classList.toggle("good", totals.balanced);
+      previewButton.disabled = false;
+      updateNetLabels(form, current);
+    } catch (error) {
+      message.textContent = error.message;
+      message.classList.remove("good");
+      previewButton.disabled = true;
+    }
+  }
+
+  function updateNetLabels(form, rows) {
+    for (const row of rows) {
+      const cell = form.querySelector('[data-net="' + row.id + '"]');
+      const net = row.final === null ? null : row.final - row.totalBuy;
+      cell.textContent = "原输赢 " + signed(net);
+      cell.className = netClass(net);
+    }
+  }
+
+  function adjustmentDescription({ delta, pool }) {
+    const amount = number(Math.abs(delta));
+    const total = `双方各按 ${number(pool)} 筹码结算。`;
+    if (delta > 0) return `多 ${amount} 筹码，按盈利比例从水上扣除。${total}`;
+    if (delta < 0) return `少 ${amount} 筹码，按亏损比例减轻水下应付。${total}`;
+    return "筹码已对平。" + total;
+  }
+
+  function chipResultRow(row) {
+    const original = row.originalNet ?? row.net;
+    return `<tr>
+      <th scope="row">${safe(row.name)}${row.final === null ? "<small>未录入，按 0</small>" : ""}</th>
+      <td>${signed(original)}</td>
+      <td>${signed(row.net - original)}</td>
+      <td class="${netClass(row.net)}"><strong>${signed(row.net)}</strong></td>
+    </tr>`;
+  }
+
+  function chipResults(result) {
+    return `<p class="notice ${result.delta ? "" : "good"}">${adjustmentDescription(result)}</p>
+      <div class="surface"><table class="result-table" aria-label="筹码结算明细">
+        <thead><tr><th scope="col">玩家</th><th scope="col">原输赢</th><th scope="col">调整</th><th scope="col">结算输赢</th></tr></thead>
+        <tbody>${result.rows.map(chipResultRow).join("")}</tbody>
+      </table></div>`;
+  }
+
+  function confirmSettlement(game, rows, counts) {
+    const current = Ledger.rowsWithCounts(rows, counts);
+    Ledger.tally(current);
+    const result = Finance.reconcile(current);
+    const note = result.missing ? `<p class="notice">有 ${result.missing} 位玩家的筹码未录入，确认后按 0 筹码结算。</p>` : "";
+    const label = result.missing ? "按 0 补齐并确认" : "确认结算";
+    const existingBill = game.checkout ? '<p class="hint">修改筹码后，原现金账单将撤回。</p>' : "";
+    show("确认筹码结算", `<form>
+      ${chipResults(result)}${note}${existingBill}${formError()}
+      <div class="modal-actions">
+        <button id="back-to-counts" class="button button-outline" type="button">返回修改</button>
+        ${submit(label)}
+      </div>
+    </form>`);
+    $("back-to-counts").addEventListener("click", () => showSettlement(counts));
+    onForm(() => save(Actions.SETTLE, { counts, confirmMissing: result.missing > 0, at: Date.now() }, game.id));
+  }
+
+  function showSettlement(counts) {
+    const game = getGame();
+    const { rows } = Ledger.summarize(ledger.data, game.id);
+    const editing = game.settledAt !== null;
+    const current = counts ? Ledger.rowsWithCounts(rows, counts) : rows;
+    const saveDraft = editing ? "" : submit("保存草稿", Actions.SAVE_SETTLEMENT, "outline");
+    show(editing ? "修改结算" : "录入结算", `<form>
+      <div class="settlement-summary"><p id="settlement-status" class="notice" aria-live="polite"></p>
+        <p class="hint">筹码有差额也可以结算。预览会列出每位玩家的调整，未录入按 0 计算。</p>
+      </div>
+      ${current.map(settlementRow).join("")}
+      ${formError()}
+      <div class="modal-actions">${saveDraft}${submit("预览结算", Actions.SETTLE)}</div>
+    </form>`);
+    const form = onForm((_, action) => {
+      const draft = settlementCounts(form, rows);
+      if (action === Actions.SAVE_SETTLEMENT) save(action, { counts: draft }, game.id);
+      else confirmSettlement(game, rows, draft);
+    });
+    form.addEventListener("input", () => settlementPreview(form, rows));
+    settlementPreview(form, rows);
+  }
+
+  function showSettlementDetails() {
+    const game = getGame();
+    const { rows } = Ledger.summarize(ledger.data, game.id);
+    const result = game.settlement
+      ? { ...game.settlement, rows: Ledger.settledRows(game, rows) }
+      : Finance.reconcile(rows);
+    show("筹码结算", chipResults(result) + `<div class="modal-actions">${actionButton("修改结算", "settlement")}</div>`);
+  }
+
+  function money(cents) {
+    const [whole, fraction] = Finance.yuanParts(cents);
+    return "¥" + number(whole) + "." + fraction;
+  }
+
+  function moneyValue(cents) {
+    const [whole, fraction] = Finance.yuanParts(BigInt(cents));
+    return whole + "." + fraction;
+  }
+
+  function billRow(row) {
+    return `<tr>
+      <th scope="row">${safe(row.name)}</th>
+      <td>${money(row.fee)}</td>
+      <td class="gain">${row.amount > 0n ? money(row.amount) : "—"}</td>
+      <td class="loss">${row.amount < 0n ? money(-row.amount) : "—"}</td>
+    </tr>`;
+  }
+
+  function billTable(bill, feeCents) {
+    return `<div class="surface"><table class="result-table" aria-label="现金结账清单">
+      <thead><tr><th scope="col">玩家</th><th scope="col">棋牌费</th><th scope="col">应收</th><th scope="col">应付</th></tr></thead>
+      <tbody>${bill.rows.map(billRow).join("")}</tbody>
+      <tfoot><tr><th scope="row">合计</th><td>${money(BigInt(feeCents) - bill.unallocated)}</td>
+        <td>${money(bill.totalReceive)}</td><td>${money(bill.totalPay)}</td></tr></tfoot>
+    </table></div>`;
+  }
+
+  function checkoutSection(game, summary) {
+    if (game.settledAt === null) return "";
+    const settings = game.checkout;
+    const button = actionButton(settings ? "修改账单" : "计算账单", "checkout", { kind: settings ? "outline" : "primary" });
+    const bill = settings ? Finance.cashBill(Ledger.settledRows(game, summary.rows), game.unit, settings) : null;
+    const copy = settings
+      ? `每手 ${money(BigInt(settings.handCents))} · 棋牌费 ${money(BigInt(settings.feeCents))} · ${feeLabels[settings.mode]}`
+      : "输入每手金额和棋牌费，生成每位玩家的应收、应付清单。";
+    return `<section class="section" aria-labelledby="checkout-title">
+      <header class="section-head"><h3 id="checkout-title">现金结账</h3>${button}</header>
+      <p class="surface hint bill-summary">${copy}</p>
+      ${bill ? billTable(bill, settings.feeCents) : ""}
+    </section>`;
+  }
+
+  function inputMoney(name, value, placeholder) {
+    return `<input name="${name}" inputmode="decimal" value="${value}" placeholder="${placeholder}" autocomplete="off" required>`;
+  }
+
+  function checkoutSettings(form) {
+    return {
+      handCents: Finance.parseYuan(form.elements.hand.value),
+      feeCents: Finance.parseYuan(form.elements.fee.value),
+      mode: form.elements.mode.value
+    };
+  }
+
+  function checkoutPreview(form, rows, unit) {
+    const preview = $("checkout-preview");
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    if (!form.elements.hand.value.trim()) {
+      preview.innerHTML = '<p class="hint">填写每手金额后可预览应收和应付。</p>';
+      return;
+    }
+    try {
+      const settings = checkoutSettings(form);
+      const bill = Finance.cashBill(rows, unit, settings);
+      const warning = bill.unallocated
+        ? `<p class="notice">还有 ${money(bill.unallocated)} 棋牌费无法分摊。请调整费用或分摊方式。</p>` : "";
+      preview.innerHTML = warning + billTable(bill, settings.feeCents);
+      button.disabled = bill.unallocated > 0n;
+    } catch (error) {
+      preview.innerHTML = `<p class="notice">${safe(error.message)}</p>`;
+    }
+  }
+
+  function feeModeSelect(mode) {
+    const options = Object.entries(feeLabels).map(([key, label]) =>
+      `<option value="${key}" ${key === mode ? "selected" : ""}>${label}</option>`);
+    return `<select name="mode">${options.join("")}</select>`;
+  }
+
+  function showCheckout() {
+    const game = getGame();
+    const settings = game.checkout;
+    const rows = Ledger.settledRows(game, Ledger.summarize(ledger.data, game.id).rows);
+    show("现金结账", `<form>
+      <div class="bill-fields">
+        ${field("每手金额（元）", inputMoney("hand", settings ? moneyValue(settings.handCents) : "", "如 100"))}
+        ${field("棋牌费（元）", inputMoney("fee", settings ? moneyValue(settings.feeCents) : "0", "0"))}
+      </div>
+      ${field("棋牌费分摊方式", feeModeSelect(settings?.mode ?? FeeModes.ALL))}
+      <div id="checkout-preview" class="bill-preview"></div>
+      ${formError()}
+      <div class="modal-actions">${submit("确认账单")}</div>
+    </form>`);
+    const form = onForm(() => save(Actions.SAVE_CHECKOUT, checkoutSettings(form), game.id));
+    const update = () => checkoutPreview(form, rows, game.unit);
+    form.addEventListener("input", update);
+    form.addEventListener("change", update);
+    update();
+  }
+
+  const ui = {
+    "new-game": showNewGame,
+    "add-players": showAddPlayers,
+    "games": showGames,
+    "settings": showSettings,
+    "open-game": openGame,
+    "delete-game": confirmGameDelete,
+    "edit-player": showPlayer,
+    "delete-player": confirmPlayerDelete,
+    "add-buy": playerId => showBuy(undefined, playerId),
+    "edit-buy": id => showBuy(id),
+    "delete-buy": confirmBuyDelete,
+    "buy-preset": chips => {
+      const input = modalBody.querySelector("form").elements.chips;
+      input.value = chips;
+    },
+    "settlement": () => showSettlement(),
+    "settlement-details": showSettlementDetails,
+    "checkout": showCheckout,
+    "reopen": confirmReopen,
+    "close": () => dialog.close()
+  };
+
+  function handleClick(event) {
+    const target = event.target.closest("[data-ui]");
+    if (!target || target.disabled) return;
+    try {
+      ui[target.dataset.ui](target.dataset.id);
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  window.addEventListener("storage", event => {
+    if (event.key !== STORAGE_KEY && event.key !== null) return;
+    dialog.close();
+    readStorage();
+    render();
+    toast("本地账本已更新");
+  });
+  $("stage").addEventListener("click", handleClick);
+  modalBody.addEventListener("click", handleClick);
+  $("new-game").addEventListener("click", showNewGame);
+  $("close-modal").addEventListener("click", () => dialog.close());
+  $("undo").addEventListener("click", () => changeHistory(Travel.UNDO));
+  $("redo").addEventListener("click", () => changeHistory(Travel.REDO));
+  $("toast-undo").addEventListener("click", () => changeHistory(Travel.UNDO));
+  readStorage();
+  render();
+}
+</script>
+</body>
+</html>
